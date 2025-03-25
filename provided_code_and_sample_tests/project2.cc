@@ -132,7 +132,7 @@ void Task2()
             }
         }
     }
-    
+
     unordered_set<string> nullable;
     bool changed = true;
     while (changed) {
@@ -487,8 +487,137 @@ void Task4()
     }
 }
 
-void Task5() {
+// Helper: compute the length of the common prefix between two productions.
+int commonPrefixLength(const vector<string>& prod1, const vector<string>& prod2) {
+    int len = min(prod1.size(), prod2.size());
+    int count = 0;
+    for (int i = 0; i < len; i++) {
+        if (prod1[i] == prod2[i])
+            count++;
+        else
+            break;
+    }
+    return count;
 }
+
+// Lexicographic comparison of two RHS vectors.
+bool lexCompare(const vector<string>& a, const vector<string>& b) {
+    int n = min(a.size(), b.size());
+    for (int i = 0; i < n; i++) {
+        if (a[i] < b[i])
+            return true;
+        else if (a[i] > b[i])
+            return false;
+    }
+    return a.size() < b.size();
+}
+
+void Task5()
+{
+    // Build a map from nonterminal to list of productions.
+    unordered_map<string, vector<vector<string>>> grammarMap;
+    for (auto &rule : grammarRules)
+        grammarMap[rule.lhs].push_back(rule.rhs);
+    
+    // Map for tracking new nonterminal names (e.g. X1, X2, etc.)
+    unordered_map<string,int> newNameCount;
+    for (auto &entry : grammarMap)
+        newNameCount[entry.first] = 0;
+    
+    bool changed = true;
+    while (changed) {
+        changed = false;
+        // Iterate over grammarMap; if a nonterminal has at least 2 productions, try to factor.
+        for (auto it = grammarMap.begin(); it != grammarMap.end(); ++it) {
+            string X = it->first;
+            vector<vector<string>> prods = it->second;
+            if (prods.size() < 2)
+                continue;
+            int bestLen = 0;
+            vector<string> bestPrefix;
+            // Compare every pair to find the longest common prefix.
+            for (int i = 0; i < prods.size(); i++) {
+                for (int j = i+1; j < prods.size(); j++) {
+                    int cp = commonPrefixLength(prods[i], prods[j]);
+                    if (cp > bestLen) {
+                        bestLen = cp;
+                        bestPrefix.assign(prods[i].begin(), prods[i].begin() + cp);
+                    } else if (cp == bestLen && cp > 0) {
+                        vector<string> currentPrefix(prods[i].begin(), prods[i].begin() + cp);
+                        if (currentPrefix < bestPrefix)
+                            bestPrefix = currentPrefix;
+                    }
+                }
+            }
+            if (bestLen > 0) {
+                // Partition productions: those with the bestPrefix and those without.
+                vector<vector<string>> factored, remaining;
+                for (auto &prod : prods) {
+                    if (prod.size() >= bestLen &&
+                        equal(prod.begin(), prod.begin() + bestLen, bestPrefix.begin()))
+                        factored.push_back(prod);
+                    else
+                        remaining.push_back(prod);
+                }
+                if (factored.size() < 2)
+                    continue;
+                // Create new nonterminal for left factoring.
+                newNameCount[X]++;
+                string newNonterm = X + to_string(newNameCount[X]);
+                vector<vector<string>> newProds;
+                // For each factored production, remove the common prefix.
+                for (auto &prod : factored) {
+                    vector<string> remainder(prod.begin() + bestLen, prod.end());
+                    newProds.push_back(remainder);
+                }
+                // Replace factored productions in X with one production: bestPrefix newNonterm.
+                vector<string> newXProd = bestPrefix;
+                newXProd.push_back(newNonterm);
+                remaining.push_back(newXProd);
+                // Update grammarMap.
+                grammarMap[X] = remaining;
+                grammarMap[newNonterm] = newProds;
+                changed = true;
+                // Restart the loop after any change.
+                break;
+            }
+        }
+    }
+    
+    // Collect all rules from the grammarMap.
+    vector<Parsing_Rules> newGrammar;
+    for (auto &entry : grammarMap) {
+        for (auto &rhs : entry.second) {
+            Parsing_Rules pr;
+            pr.lhs = entry.first;
+            pr.rhs = rhs;
+            newGrammar.push_back(pr);
+        }
+    }
+    
+    // Sort lexicographically: compare LHS first, then RHS (symbol by symbol; shorter comes first if prefix).
+    sort(newGrammar.begin(), newGrammar.end(), [](const Parsing_Rules &a, const Parsing_Rules &b) {
+        if (a.lhs != b.lhs)
+            return a.lhs < b.lhs;
+        int n = min(a.rhs.size(), b.rhs.size());
+        for (int i = 0; i < n; i++) {
+            if (a.rhs[i] != b.rhs[i])
+                return a.rhs[i] < b.rhs[i];
+        }
+        return a.rhs.size() < b.rhs.size();
+    });
+    
+    // Print the rules in the required format.
+    for (auto &rule : newGrammar) {
+        cout << rule.lhs << " ->";
+        if (!rule.rhs.empty()) {
+            for (auto &sym : rule.rhs)
+                cout << " " << sym;
+        }
+        cout << " #" << endl;
+    }
+}
+
 
 void Task6() {
 }
