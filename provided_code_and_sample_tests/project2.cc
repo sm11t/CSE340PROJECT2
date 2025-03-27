@@ -32,9 +32,9 @@ void eat(TokenType expected) {
 }
 
 vector<string> id_list();
-vector< vector<string> > right_hand_side();
+vector< vector<string> > rrhs();
 
-vector< vector<string> > right_hand_side() {
+vector< vector<string> > rrhs() {
     vector< vector<string> > alternatives;
     vector<string> alt = id_list();
     alternatives.push_back(alt);
@@ -61,7 +61,7 @@ void ReadGrammar() {
         string lhs = currentToken.lexeme;
         eat(ID);
         eat(ARROW);
-        vector< vector<string> > alternatives = right_hand_side();
+        vector< vector<string> > alternatives = rrhs();
         eat(STAR);
         for (auto &alt : alternatives) {
             Parsing_Rules pr;
@@ -252,7 +252,7 @@ unordered_map<string, vector<string>> computeFollowSets(
     return follow;
 }
 
-// Helper: compute the length of the common prefix between two productions.
+//computing the length of the common prefix
 int commonPrefixLength(const vector<string>& prod1, const vector<string>& prod2) {
     int len = min(prod1.size(), prod2.size());
     int count = 0;
@@ -265,7 +265,7 @@ int commonPrefixLength(const vector<string>& prod1, const vector<string>& prod2)
     return count;
 }
 
-// Lexicographic comparison of two RHS vectors.
+// Lexicographic comparison of two RHS
 bool lexCompare(const vector<string>& a, const vector<string>& b) {
     int n = min(a.size(), b.size());
     for (int i = 0; i < n; i++) {
@@ -290,13 +290,16 @@ void Task1()
     }
     vector<string> terminalOrder, nonterminalOrder;
     unordered_set<string> seenTerminals, seenNonterminals;
+
     for (auto &sym : orderedSymbols) {
         if (nonterminalSet.find(sym) != nonterminalSet.end()) {
+
             if (seenNonterminals.find(sym) == seenNonterminals.end()) {
                 nonterminalOrder.push_back(sym);
                 seenNonterminals.insert(sym);
             }
-        } else {
+        }
+        else {
             if (seenTerminals.find(sym) == seenTerminals.end()) {
                 terminalOrder.push_back(sym);
                 seenTerminals.insert(sym);
@@ -344,15 +347,14 @@ void Task2()
                 nullable.insert(rule.lhs);
                 changed = true;
             } else {
-                bool allNullable = true;
+                bool allNull = true;
                 for (auto &sym : rule.rhs) {
-                    // If symbol is terminal or nonterminal not nullable, production isn't nullable.
                     if (nonterminalSet.find(sym) == nonterminalSet.end() || nullable.find(sym) == nullable.end()) {
-                        allNullable = false;
+                        allNull = false;
                         break;
                     }
                 }
-                if (allNullable) {
+                if (allNull) {
                     nullable.insert(rule.lhs);
                     changed = true;
                 }
@@ -430,15 +432,15 @@ void Task5()
     for (auto &rule : grammarRules)
         grammarMap[rule.lhs].push_back(rule.rhs);
     
-    // Map for tracking new nonterminal names (e.g. X1, X2, etc.)
-    unordered_map<string,int> newNameCount;
+    //tracking new nonterminal names
+    unordered_map<string,int> count;
     for (auto &entry : grammarMap)
-        newNameCount[entry.first] = 0;
+        count[entry.first] = 0;
     
     bool changed = true;
     while (changed) {
         changed = false;
-        // Iterate over grammarMap; if a nonterminal has at least 2 productions, try to factor.
+        // Iterating over grammarMap;
         for (auto it = grammarMap.begin(); it != grammarMap.end(); ++it) {
             string X = it->first;
             vector<vector<string>> prods = it->second;
@@ -473,8 +475,8 @@ void Task5()
                 if (factored.size() < 2)
                     continue;
                 // Create new nonterminal for left factoring.
-                newNameCount[X]++;
-                string newNonterm = X + to_string(newNameCount[X]);
+                count[X]++;
+                string newNonterm = X + to_string(count[X]);
                 vector<vector<string>> newProds;
                 // For each factored production, remove the common prefix.
                 for (auto &prod : factored) {
@@ -532,7 +534,7 @@ void Task5()
 void eliminateImmediateLeftRec(
     const string &A,
     unordered_map<string, vector<vector<string>>> &rules,
-    unordered_map<string,int> &newNameCount // how many times we've introduced A1, A2, ...
+    unordered_map<string,int> &count // count of introduction
 ) {
     vector<vector<string>> &prods = rules[A];
 
@@ -549,77 +551,61 @@ void eliminateImmediateLeftRec(
             betaSet.push_back(rhs);
         }
     }
-
-    // If no alpha-rules, nothing to do
     if (alphaSet.empty()) {
         return;
     }
-
-    // We do have direct left recursion, so produce a new name A1 (or A2, etc.)
-    newNameCount[A]++;
-    string Aprime = A + to_string(newNameCount[A]);
-
-    // Rewrite rules[A] to contain only the "beta Aprime" ones
+    count[A]++;
+    string Aprime = A + to_string(count[A]);
     vector<vector<string>> newA;
     for (auto &beta : betaSet) {
-        // A -> β Aprime
-        vector<string> rhs = beta;    // copy β
-        rhs.push_back(Aprime);        // append Aprime
+    
+        vector<string> rhs = beta;   
+        rhs.push_back(Aprime);    
         newA.push_back(rhs);
     }
     rules[A] = newA; // overwrite
 
     // Build rules for A'
     vector<vector<string>> newAprime;
-    // For each alpha rule, A1 -> alpha A1
     for (auto &alpha : alphaSet) {
-        vector<string> rhs = alpha;   // copy alpha
-        rhs.push_back(Aprime);        // append Aprime
+        vector<string> rhs = alpha;   
+        rhs.push_back(Aprime);        
         newAprime.push_back(rhs);
     }
-    // Also add A1 -> ε
-    // We represent ε as an empty vector
     newAprime.push_back({});
 
     // Insert Aprime into the grammar
     rules[Aprime] = newAprime;
 }
 
-// For a rule Ai -> Aj γ, we replace it with Ai -> δ γ for each rule (Aj -> δ) in rules[Aj].
 void rewriteIndirect(
     const string &Ai,
     const string &Aj,
     unordered_map<string, vector<vector<string>>> &rules
 ) {
     vector<vector<string>> &AiProds = rules[Ai];
-    vector<vector<string>> newProds;  // will hold the updated list for Ai
+    vector<vector<string>> newProds;
 
     for (auto &rhs : AiProds) {
-        // Check if Ai -> Aj γ
         if (!rhs.empty() && rhs[0] == Aj) {
-            // For each production of Aj -> δ, produce Ai -> δ γ
             vector<vector<string>> &AjProds = rules[Aj];
-            vector<string> gamma(rhs.begin() + 1, rhs.end()); // everything after Aj
+            vector<string> gamma(rhs.begin() + 1, rhs.end()); 
             for (auto &delta : AjProds) {
-                // build δ + γ
                 vector<string> newRHS = delta;
-                // then append gamma
                 newRHS.insert(newRHS.end(), gamma.begin(), gamma.end());
                 newProds.push_back(newRHS);
             }
         } else {
-            // Keep Ai -> rhs as is
             newProds.push_back(rhs);
         }
     }
-    // Replace Ai's rules
     AiProds = newProds;
 }
 
 
 void Task6()
 {
-    // 1) Collect all non-terminals and sort them lexicographically
+    // 1) Collecting non-terminals and sorting them
     unordered_set<string> nonterminalSet;
     for (auto &rule : grammarRules) {
         nonterminalSet.insert(rule.lhs);
@@ -628,16 +614,11 @@ void Task6()
     vector<string> sortedNT(nonterminalSet.begin(), nonterminalSet.end());
     sort(sortedNT.begin(), sortedNT.end());
 
-    // 2) Build a map from NonTerminal -> list of productions (RHS vectors)
-    //    We also want to collect any other "nonterminals" that appear as we go
-    //    but the spec says we only do rewriting for these original ones in sorted order.
+    // Buildiung map from nonTerminal to list of productions
     unordered_map<string, vector<vector<string>>> rulesMap;
     for (auto &nt : sortedNT) {
-        rulesMap[nt] = {}; // Initialize empty
+        rulesMap[nt] = {}; // Initializing empty
     }
-
-    // Also track any symbols that appear on the LHS that might not have been in sortedNT
-    // (rare edge cases, but for cleanliness, let's store them too)
     for (auto &rule : grammarRules) {
         if (rulesMap.find(rule.lhs) == rulesMap.end()) {
             // It's a new NT not in sortedNT (?), we add it
@@ -650,14 +631,9 @@ void Task6()
         rulesMap[rule.lhs].push_back(rule.rhs);
     }
 
-    // We'll need to track new nonterminals introduced for immediate left recursion, like A1, A2, ...
-    // For each original A, how many times have we introduced an A1, A2...?
-    unordered_map<string,int> newNameCount;
 
-    // 3) The standard algorithm:
-    //    for i in [1..n], for j in [1..i-1], rewrite Ai’s rules that begin with Aj
-    //    then eliminate immediate left recursion from Ai
-    // Remember that sortedNT is zero-based in C++ but that’s just an index shift
+    unordered_map<string,int> count;
+
     for (int i = 0; i < (int)sortedNT.size(); i++) {
         string Ai = sortedNT[i];
         // For j in [0..i-1]
@@ -667,19 +643,11 @@ void Task6()
             rewriteIndirect(Ai, Aj, rulesMap);
         }
         // Now eliminate immediate left recursion from Ai
-        eliminateImmediateLeftRec(Ai, rulesMap, newNameCount);
+        eliminateImmediateLeftRec(Ai, rulesMap, count);
     }
 
-    // 4) At this point, we have removed all left recursion from the original non-terminals in sortedNT.
-    //    The rewriting steps can produce new non-terminals (e.g., A1). We do NOT re-run the
-    //    rewriting steps on those new ones, per the spec's standard method.
-
-    // 5) Collect all rules (including newly introduced A1, etc.) into a big vector
-    //    so we can sort them lexicographically and print
     vector<Parsing_Rules> finalGrammar;
-
-    // We want to gather every nonterminal that ended up in rulesMap,
-    // which includes the newly introduced ones. Let's do a second pass:
+    
     vector<string> allNT;
     for (auto &kv : rulesMap) {
         allNT.push_back(kv.first);
