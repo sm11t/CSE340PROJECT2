@@ -618,8 +618,199 @@ void Task5()
     }
 }
 
+void eliminateImmediateLeftRec(
+    const string &A,
+    unordered_map<string, vector<vector<string>>> &rules,
+    unordered_map<string,int> &newNameCount // how many times we've introduced A1, A2, ...
+) {
+    vector<vector<string>> &prods = rules[A];
 
-void Task6() {
+    // Partition into alpha-rules (start with A) and beta-rules (start != A)
+    vector<vector<string>> alphaSet;
+    vector<vector<string>> betaSet;
+    for (auto &rhs : prods) {
+        if (!rhs.empty() && rhs[0] == A) {
+            // A -> A alpha
+            vector<string> alpha(rhs.begin() + 1, rhs.end());
+            alphaSet.push_back(alpha);
+        } else {
+            // A -> β
+            betaSet.push_back(rhs);
+        }
+    }
+
+    // If no alpha-rules, nothing to do
+    if (alphaSet.empty()) {
+        return;
+    }
+
+    // We do have direct left recursion, so produce a new name A1 (or A2, etc.)
+    newNameCount[A]++;
+    string Aprime = A + to_string(newNameCount[A]);
+
+    // Rewrite rules[A] to contain only the "beta Aprime" ones
+    vector<vector<string>> newA;
+    for (auto &beta : betaSet) {
+        // A -> β Aprime
+        vector<string> rhs = beta;    // copy β
+        rhs.push_back(Aprime);        // append Aprime
+        newA.push_back(rhs);
+    }
+    rules[A] = newA; // overwrite
+
+    // Build rules for A'
+    vector<vector<string>> newAprime;
+    // For each alpha rule, A1 -> alpha A1
+    for (auto &alpha : alphaSet) {
+        vector<string> rhs = alpha;   // copy alpha
+        rhs.push_back(Aprime);        // append Aprime
+        newAprime.push_back(rhs);
+    }
+    // Also add A1 -> ε
+    // We represent ε as an empty vector
+    newAprime.push_back({});
+
+    // Insert Aprime into the grammar
+    rules[Aprime] = newAprime;
+}
+
+// For a rule Ai -> Aj γ, we replace it with Ai -> δ γ for each rule (Aj -> δ) in rules[Aj].
+void rewriteIndirect(
+    const string &Ai,
+    const string &Aj,
+    unordered_map<string, vector<vector<string>>> &rules
+) {
+    vector<vector<string>> &AiProds = rules[Ai];
+    vector<vector<string>> newProds;  // will hold the updated list for Ai
+
+    for (auto &rhs : AiProds) {
+        // Check if Ai -> Aj γ
+        if (!rhs.empty() && rhs[0] == Aj) {
+            // For each production of Aj -> δ, produce Ai -> δ γ
+            vector<vector<string>> &AjProds = rules[Aj];
+            vector<string> gamma(rhs.begin() + 1, rhs.end()); // everything after Aj
+            for (auto &delta : AjProds) {
+                // build δ + γ
+                vector<string> newRHS = delta;
+                // then append gamma
+                newRHS.insert(newRHS.end(), gamma.begin(), gamma.end());
+                newProds.push_back(newRHS);
+            }
+        } else {
+            // Keep Ai -> rhs as is
+            newProds.push_back(rhs);
+        }
+    }
+    // Replace Ai's rules
+    AiProds = newProds;
+}
+
+
+void Task6()
+{
+    // 1) Collect all non-terminals and sort them lexicographically
+    unordered_set<string> ntSet;
+    for (auto &rule : grammarRules) {
+        ntSet.insert(rule.lhs);
+    }
+    // We'll store the original non-terminals in a vector and sort them
+    vector<string> sortedNT(ntSet.begin(), ntSet.end());
+    sort(sortedNT.begin(), sortedNT.end());
+
+    // 2) Build a map from NonTerminal -> list of productions (RHS vectors)
+    //    We also want to collect any other "nonterminals" that appear as we go
+    //    but the spec says we only do rewriting for these original ones in sorted order.
+    unordered_map<string, vector<vector<string>>> rulesMap;
+    for (auto &nt : sortedNT) {
+        rulesMap[nt] = {}; // Initialize empty
+    }
+
+    // Also track any symbols that appear on the LHS that might not have been in sortedNT
+    // (rare edge cases, but for cleanliness, let's store them too)
+    for (auto &rule : grammarRules) {
+        if (rulesMap.find(rule.lhs) == rulesMap.end()) {
+            // It's a new NT not in sortedNT (?), we add it
+            rulesMap[rule.lhs] = {};
+        }
+    }
+
+    // Now actually populate
+    for (auto &rule : grammarRules) {
+        rulesMap[rule.lhs].push_back(rule.rhs);
+    }
+
+    // We'll need to track new nonterminals introduced for immediate left recursion, like A1, A2, ...
+    // For each original A, how many times have we introduced an A1, A2...?
+    unordered_map<string,int> newNameCount;
+
+    // 3) The standard algorithm:
+    //    for i in [1..n], for j in [1..i-1], rewrite Ai’s rules that begin with Aj
+    //    then eliminate immediate left recursion from Ai
+    // Remember that sortedNT is zero-based in C++ but that’s just an index shift
+    for (int i = 0; i < (int)sortedNT.size(); i++) {
+        string Ai = sortedNT[i];
+        // For j in [0..i-1]
+        for (int j = 0; j < i; j++) {
+            string Aj = sortedNT[j];
+            // rewrite Ai -> Aj gamma
+            rewriteIndirect(Ai, Aj, rulesMap);
+        }
+        // Now eliminate immediate left recursion from Ai
+        eliminateImmediateLeftRec(Ai, rulesMap, newNameCount);
+    }
+
+    // 4) At this point, we have removed all left recursion from the original non-terminals in sortedNT.
+    //    The rewriting steps can produce new non-terminals (e.g., A1). We do NOT re-run the
+    //    rewriting steps on those new ones, per the spec's standard method.
+
+    // 5) Collect all rules (including newly introduced A1, etc.) into a big vector
+    //    so we can sort them lexicographically and print
+    vector<Parsing_Rules> finalGrammar;
+
+    // We want to gather every nonterminal that ended up in rulesMap,
+    // which includes the newly introduced ones. Let's do a second pass:
+    vector<string> allNT;
+    for (auto &kv : rulesMap) {
+        allNT.push_back(kv.first);
+    }
+    sort(allNT.begin(), allNT.end()); // so that when we gather final rules, we gather in alpha order
+    // Then gather
+    for (auto &A : allNT) {
+        for (auto &rhs : rulesMap[A]) {
+            Parsing_Rules pr;
+            pr.lhs = A;
+            pr.rhs = rhs;
+            finalGrammar.push_back(pr);
+        }
+    }
+
+    // Sort the final list of rules by (LHS, then RHS) in dictionary order.
+    // This is the same approach you used in Task5:
+    sort(finalGrammar.begin(), finalGrammar.end(), [](const Parsing_Rules &a, const Parsing_Rules &b) {
+        // Compare LHS first
+        if (a.lhs != b.lhs) {
+            return a.lhs < b.lhs;
+        }
+        // Then compare RHS lexicographically
+        int n = min(a.rhs.size(), b.rhs.size());
+        for (int i = 0; i < n; i++) {
+            if (a.rhs[i] != b.rhs[i]) {
+                return a.rhs[i] < b.rhs[i];
+            }
+        }
+        return a.rhs.size() < b.rhs.size();
+    });
+
+    // 6) Print them in the required format
+    for (auto &rule : finalGrammar) {
+        cout << rule.lhs << " ->";
+        if (!rule.rhs.empty()) {
+            for (auto &sym : rule.rhs) {
+                cout << " " << sym;
+            }
+        }
+        cout << " #" << endl;
+    }
 }
     
 int main (int argc, char* argv[])
