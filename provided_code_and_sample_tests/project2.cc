@@ -19,6 +19,7 @@ vector<Parsing_Rules> grammarRules;
 LexicalAnalyzer lex;
 Token currentToken;
 
+// Basic lexer functions
 void getNextToken() {
     currentToken = lex.GetToken();
 }
@@ -31,6 +32,7 @@ void eat(TokenType expected) {
     getNextToken();
 }
 
+// Parsing functions
 vector<string> id_list();
 vector< vector<string> > rrhs();
 
@@ -57,7 +59,7 @@ vector<string> id_list() {
 
 void ReadGrammar() {
     getNextToken();
-    while (currentToken.token_type == ID){
+    while (currentToken.token_type == ID) {
         string lhs = currentToken.lexeme;
         eat(ID);
         eat(ARROW);
@@ -70,7 +72,6 @@ void ReadGrammar() {
             grammarRules.push_back(pr);
         }
     }
-
     if (currentToken.token_type != HASH) {
         cout << "SYNTAX ERROR !!!!!!!!!!!!!!" << endl;
         exit(1);
@@ -78,8 +79,8 @@ void ReadGrammar() {
     eat(HASH);
 }
 
-//Helper Functions
-
+/* Helper Functions */
+// Get set of nonterminals (LHS symbols)
 unordered_set<string> getNonterminals(const vector<Parsing_Rules>& rules) {
     unordered_set<string> nts;
     for (auto &r : rules)
@@ -87,6 +88,7 @@ unordered_set<string> getNonterminals(const vector<Parsing_Rules>& rules) {
     return nts;
 }
 
+// Build overall order of nonterminals as they appear
 vector<string> getOverallNTOrder(const vector<Parsing_Rules>& rules, const unordered_set<string>& ntSet) {
     vector<string> order;
     unordered_set<string> seen;
@@ -105,6 +107,7 @@ vector<string> getOverallNTOrder(const vector<Parsing_Rules>& rules, const unord
     return order;
 }
 
+// Compute nullable set
 unordered_set<string> computeNullableSet(const vector<Parsing_Rules>& rules, const unordered_set<string>& ntSet) {
     unordered_set<string> nullable;
     bool change = true;
@@ -134,6 +137,7 @@ unordered_set<string> computeNullableSet(const vector<Parsing_Rules>& rules, con
     return nullable;
 }
 
+// Build terminal order from RHS
 vector<string> getTerminalOrder(const vector<Parsing_Rules>& rules, const unordered_set<string>& ntSet) {
     vector<string> order;
     for (auto &r : rules) {
@@ -145,6 +149,7 @@ vector<string> getTerminalOrder(const vector<Parsing_Rules>& rules, const unorde
     return order;
 }
 
+// Compute FIRST sets
 unordered_map<string, vector<string>> computeFirstSets(
     const vector<Parsing_Rules>& rules,
     const unordered_set<string>& ntSet,
@@ -193,6 +198,7 @@ unordered_map<string, vector<string>> computeFirstSets(
     return first;
 }
 
+// Compute FOLLOW sets
 unordered_map<string, vector<string>> computeFollowSets(
     const vector<Parsing_Rules>& rules,
     const unordered_set<string>& ntSet,
@@ -252,7 +258,7 @@ unordered_map<string, vector<string>> computeFollowSets(
     return follow;
 }
 
-//computing the length of the common prefix
+// Compute common prefix length
 int commonPrefixLength(const vector<string>& prod1, const vector<string>& prod2) {
     int len = min(prod1.size(), prod2.size());
     int count = 0;
@@ -265,7 +271,7 @@ int commonPrefixLength(const vector<string>& prod1, const vector<string>& prod2)
     return count;
 }
 
-// Lexicographic comparison of two RHS
+// Lexicographic comparison for RHS vectors
 bool lexCompare(const vector<string>& a, const vector<string>& b) {
     int n = min(a.size(), b.size());
     for (int i = 0; i < n; i++) {
@@ -277,8 +283,10 @@ bool lexCompare(const vector<string>& a, const vector<string>& b) {
     return a.size() < b.size();
 }
 
-void Task1()
-{
+/* Task Functions */
+
+// Task 1: Print terminals then nonterminals in order
+void Task1() {
     unordered_set<string> nonterminalSet;
     for (auto &rule : grammarRules)
         nonterminalSet.insert(rule.lhs);
@@ -290,10 +298,8 @@ void Task1()
     }
     vector<string> terminalOrder, nonterminalOrder;
     unordered_set<string> seenTerminals, seenNonterminals;
-
     for (auto &sym : orderedSymbols) {
         if (nonterminalSet.find(sym) != nonterminalSet.end()) {
-
             if (seenNonterminals.find(sym) == seenNonterminals.end()) {
                 nonterminalOrder.push_back(sym);
                 seenNonterminals.insert(sym);
@@ -312,14 +318,11 @@ void Task1()
         cout << s << " ";
 }
 
-void Task2()
-{
-    // Finding from LHS
+// Task 2: Compute and print Nullable set
+void Task2() {
     unordered_set<string> nonterminalSet;
     for (auto &rule : grammarRules)
         nonterminalSet.insert(rule.lhs);
-
-    //scanning rules in input order and building order of nonterminals
     vector<string> overallOrder;
     unordered_set<string> seen;
     for (auto &rule : grammarRules) {
@@ -334,7 +337,6 @@ void Task2()
             }
         }
     }
-
     unordered_set<string> nullable;
     bool changed = true;
     while (changed) {
@@ -342,7 +344,6 @@ void Task2()
         for (auto &rule : grammarRules) {
             if (nullable.count(rule.lhs))
                 continue;
-            // If production is epsilon, mark LHS as nullable.
             if (rule.rhs.empty()) {
                 nullable.insert(rule.lhs);
                 changed = true;
@@ -361,8 +362,6 @@ void Task2()
             }
         }
     }
-
-    // Print Nullable set in overall order.
     cout << "Nullable = { ";
     bool first = true;
     for (auto &nt : overallOrder) {
@@ -376,6 +375,7 @@ void Task2()
     cout << " }" << endl;
 }
 
+// Task 3: Compute and print FIRST sets
 void Task3() {
     auto ntSet = getNonterminals(grammarRules);
     auto overallNT = getOverallNTOrder(grammarRules, ntSet);
@@ -395,6 +395,7 @@ void Task3() {
     }
 }
 
+// Task 4: Compute and print FOLLOW sets
 void Task4() {
     auto ntSet = getNonterminals(grammarRules);
     auto overallNT = getOverallNTOrder(grammarRules, ntSet);
@@ -424,23 +425,17 @@ void Task4() {
     }
 }
 
-
-void Task5()
-{
-    // Build a map from nonterminal to list of productions.
+// Task 5: Left Factoring
+void Task5() {
     unordered_map<string, vector<vector<string>>> grammarMap;
     for (auto &rule : grammarRules)
         grammarMap[rule.lhs].push_back(rule.rhs);
-    
-    //tracking new nonterminal names
     unordered_map<string,int> count;
     for (auto &entry : grammarMap)
         count[entry.first] = 0;
-    
     bool changed = true;
     while (changed) {
         changed = false;
-        // Iterating over grammarMap;
         for (auto it = grammarMap.begin(); it != grammarMap.end(); ++it) {
             string X = it->first;
             vector<vector<string>> prods = it->second;
@@ -448,7 +443,6 @@ void Task5()
                 continue;
             int bestLen = 0;
             vector<string> bestPrefix;
-            // Compare every pair to find the longest common prefix.
             for (int i = 0; i < prods.size(); i++) {
                 for (int j = i+1; j < prods.size(); j++) {
                     int cp = commonPrefixLength(prods[i], prods[j]);
@@ -463,7 +457,6 @@ void Task5()
                 }
             }
             if (bestLen > 0) {
-                // Partition productions: those with the bestPrefix and those without.
                 vector<vector<string>> factored, remaining;
                 for (auto &prod : prods) {
                     if (prod.size() >= bestLen &&
@@ -474,30 +467,23 @@ void Task5()
                 }
                 if (factored.size() < 2)
                     continue;
-                // Create new nonterminal for left factoring.
                 count[X]++;
                 string newNonterm = X + to_string(count[X]);
-                vector<vector<string>> newProds;
-                // For each factored production, remove the common prefix.
+                vector<vector<string>> newprod;
                 for (auto &prod : factored) {
                     vector<string> remainder(prod.begin() + bestLen, prod.end());
-                    newProds.push_back(remainder);
+                    newprod.push_back(remainder);
                 }
-                // Replace factored productions in X with one production: bestPrefix newNonterm.
                 vector<string> newXProd = bestPrefix;
                 newXProd.push_back(newNonterm);
                 remaining.push_back(newXProd);
-                // Update grammarMap.
                 grammarMap[X] = remaining;
-                grammarMap[newNonterm] = newProds;
+                grammarMap[newNonterm] = newprod;
                 changed = true;
-                // Restart the loop after any change.
                 break;
             }
         }
     }
-    
-    // Collect all rules from the grammarMap.
     vector<Parsing_Rules> newGrammar;
     for (auto &entry : grammarMap) {
         for (auto &rhs : entry.second) {
@@ -507,8 +493,6 @@ void Task5()
             newGrammar.push_back(pr);
         }
     }
-    
-    // Sort lexicographically: compare LHS first, then RHS (symbol by symbol; shorter comes first if prefix).
     sort(newGrammar.begin(), newGrammar.end(), [](const Parsing_Rules &a, const Parsing_Rules &b) {
         if (a.lhs != b.lhs)
             return a.lhs < b.lhs;
@@ -519,8 +503,6 @@ void Task5()
         }
         return a.rhs.size() < b.rhs.size();
     });
-    
-    // Print the rules in the required format.
     for (auto &rule : newGrammar) {
         cout << rule.lhs << " ->";
         if (!rule.rhs.empty()) {
@@ -531,50 +513,40 @@ void Task5()
     }
 }
 
+// Left recursion elimination helpers
 void eliminateImmediateLeftRec(
     const string &A,
     unordered_map<string, vector<vector<string>>> &rules,
-    unordered_map<string,int> &count // count of introduction
+    unordered_map<string,int> &count
 ) {
     vector<vector<string>> &prods = rules[A];
-
-    // Partition into alpha-rules (start with A) and beta-rules (start != A)
-    vector<vector<string>> alphaSet;
-    vector<vector<string>> betaSet;
+    vector<vector<string>> alphaSet, betaSet;
     for (auto &rhs : prods) {
         if (!rhs.empty() && rhs[0] == A) {
-            // A -> A alpha
             vector<string> alpha(rhs.begin() + 1, rhs.end());
             alphaSet.push_back(alpha);
         } else {
-            // A -> β
             betaSet.push_back(rhs);
         }
     }
-    if (alphaSet.empty()) {
+    if (alphaSet.empty())
         return;
-    }
     count[A]++;
     string Aprime = A + to_string(count[A]);
     vector<vector<string>> newA;
     for (auto &beta : betaSet) {
-    
-        vector<string> rhs = beta;   
-        rhs.push_back(Aprime);    
+        vector<string> rhs = beta;
+        rhs.push_back(Aprime);
         newA.push_back(rhs);
     }
-    rules[A] = newA; // overwrite
-
-    // Build rules for A'
+    rules[A] = newA;
     vector<vector<string>> newAprime;
     for (auto &alpha : alphaSet) {
-        vector<string> rhs = alpha;   
-        rhs.push_back(Aprime);        
+        vector<string> rhs = alpha;
+        rhs.push_back(Aprime);
         newAprime.push_back(rhs);
     }
     newAprime.push_back({});
-
-    // Insert Aprime into the grammar
     rules[Aprime] = newAprime;
 }
 
@@ -583,77 +555,54 @@ void rewriteIndirect(
     const string &Aj,
     unordered_map<string, vector<vector<string>>> &rules
 ) {
-    vector<vector<string>> &AiProds = rules[Ai];
-    vector<vector<string>> newProds;
-
-    for (auto &rhs : AiProds) {
+    vector<vector<string>> &iniprod = rules[Ai];
+    vector<vector<string>> newprod;
+    for (auto &rhs : iniprod) {
         if (!rhs.empty() && rhs[0] == Aj) {
             vector<vector<string>> &AjProds = rules[Aj];
-            vector<string> gamma(rhs.begin() + 1, rhs.end()); 
+            vector<string> gamma(rhs.begin() + 1, rhs.end());
             for (auto &delta : AjProds) {
                 vector<string> newRHS = delta;
                 newRHS.insert(newRHS.end(), gamma.begin(), gamma.end());
-                newProds.push_back(newRHS);
+                newprod.push_back(newRHS);
             }
         } else {
-            newProds.push_back(rhs);
+            newprod.push_back(rhs);
         }
     }
-    AiProds = newProds;
+    iniprod = newprod;
 }
 
-
-void Task6()
-{
-    // 1) Collecting non-terminals and sorting them
-    unordered_set<string> nonterminalSet;
-    for (auto &rule : grammarRules) {
-        nonterminalSet.insert(rule.lhs);
-    }
-    // We'll store the original non-terminals in a vector and sort them
-    vector<string> sortedNT(nonterminalSet.begin(), nonterminalSet.end());
+// Task 6: Eliminate left recursion and print final grammar
+void Task6() {
+    unordered_set<string> ntSet;
+    for (auto &r : grammarRules)
+        ntSet.insert(r.lhs);
+    vector<string> sortedNT(ntSet.begin(), ntSet.end());
     sort(sortedNT.begin(), sortedNT.end());
-
-    // Buildiung map from nonTerminal to list of productions
     unordered_map<string, vector<vector<string>>> rulesMap;
-    for (auto &nt : sortedNT) {
-        rulesMap[nt] = {}; // Initializing empty
+    for (auto &nt : sortedNT)
+        rulesMap[nt] = {};
+    for (auto &r : grammarRules) {
+        if (!rulesMap.count(r.lhs))
+            rulesMap[r.lhs] = {};
     }
-    for (auto &rule : grammarRules) {
-        if (rulesMap.find(rule.lhs) == rulesMap.end()) {
-            // It's a new NT not in sortedNT (?), we add it
-            rulesMap[rule.lhs] = {};
-        }
-    }
-
-    // Now actually populate
-    for (auto &rule : grammarRules) {
-        rulesMap[rule.lhs].push_back(rule.rhs);
-    }
-
-
+    for (auto &r : grammarRules)
+        rulesMap[r.lhs].push_back(r.rhs);
     unordered_map<string,int> count;
-
     for (int i = 0; i < (int)sortedNT.size(); i++) {
         string Ai = sortedNT[i];
-        // For j in [0..i-1]
         for (int j = 0; j < i; j++) {
             string Aj = sortedNT[j];
-            // rewrite Ai -> Aj gamma
             rewriteIndirect(Ai, Aj, rulesMap);
         }
-        // Now eliminate immediate left recursion from Ai
         eliminateImmediateLeftRec(Ai, rulesMap, count);
     }
-
-    vector<Parsing_Rules> finalGrammar;
-    
     vector<string> allNT;
-    for (auto &kv : rulesMap) {
+    for (auto &kv : rulesMap)
         allNT.push_back(kv.first);
-    }
-    sort(allNT.begin(), allNT.end()); // so that when we gather final rules, we gather in alpha order
-    // Then gather
+    sort(allNT.begin(), allNT.end());
+    vector<Parsing_Rules> finalGrammar;
     for (auto &A : allNT) {
         for (auto &rhs : rulesMap[A]) {
             Parsing_Rules pr;
@@ -662,42 +611,32 @@ void Task6()
             finalGrammar.push_back(pr);
         }
     }
-
     sort(finalGrammar.begin(), finalGrammar.end(), [](const Parsing_Rules &a, const Parsing_Rules &b) {
-        // Compare LHS first
-        if (a.lhs != b.lhs) {
+        if (a.lhs != b.lhs)
             return a.lhs < b.lhs;
-        }
-        // comparing RHS
         int n = min(a.rhs.size(), b.rhs.size());
         for (int i = 0; i < n; i++) {
-            if (a.rhs[i] != b.rhs[i]) {
+            if (a.rhs[i] != b.rhs[i])
                 return a.rhs[i] < b.rhs[i];
-            }
         }
         return a.rhs.size() < b.rhs.size();
     });
-
-    // printing in the required format
-    for (auto &rule : finalGrammar) {
-        cout << rule.lhs << " ->";
-        if (!rule.rhs.empty()) {
-            for (auto &sym : rule.rhs) {
+    for (auto &r : finalGrammar) {
+        cout << r.lhs << " ->";
+        if (!r.rhs.empty()) {
+            for (auto &sym : r.rhs)
                 cout << " " << sym;
-            }
         }
         cout << " #" << endl;
     }
 }
     
-int main (int argc, char* argv[])
-{
-    int task;
+int main (int argc, char* argv[]) {
     if (argc < 2) {
         cout << "Error: missing argument\n";
         return 1;
     }
-    task = atoi(argv[1]);
+    int task = atoi(argv[1]);
     ReadGrammar();
     switch (task) {
         case 1: Task1(); break;
